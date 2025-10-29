@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { useQuery } from '@tanstack/react-query'
-const http = axios.create({ baseURL: '/api' })
-//const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+export const http = axios.create({ baseURL: API_BASE });
 
 export type TreeItem = { name: string; path: string; isDir: boolean }
 
