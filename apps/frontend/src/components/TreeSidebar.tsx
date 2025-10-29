@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useTree, TreeItem, mkdir, removePath, movePath, copyPath, downloadFile, downloadZip } from '../services/files'
+import { useTree, TreeItem, mkdir, removePath, movePath, copyPath, downloadFile, downloadZip, getTree  } from '../services/files'
 import ContextMenu, { type CtxItem } from './ContextMenu'
 
 type Node = { path: string; name: string; isDir: boolean; expanded: boolean; children?: Node[]; loading?: boolean }
@@ -14,6 +14,16 @@ function labelStyle(): React.CSSProperties {
     whiteSpace: 'nowrap',
     verticalAlign: 'top',
     color: '#e2e8f0'
+  }
+}
+
+async function expandFolder(path: string) {
+  try {
+    const data = await getTree(path)   // ← uses API_BASE
+    // update state with children...
+  } catch (e) {
+    console.error('Failed to load folder', path, e)
+    alert(`Failed to load folder: ${path}`)
   }
 }
 

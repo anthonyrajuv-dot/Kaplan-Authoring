@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useQuery } from '@tanstack/react-query'
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+export const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 export const http = axios.create({ baseURL: API_BASE });
 
 export type TreeItem = { name: string; path: string; isDir: boolean }
@@ -9,7 +9,7 @@ export function useTree(path: string) {
   return useQuery({ queryKey: ['tree', path],
     queryFn: async () => (await http.get<TreeItem[]>('/files/tree', { params: { path } })).data })
 }
-export async function getFile(path: string) {
+export async function getTree(path: string) {
   const r = await http.get('/files/content', { params: { path }, responseType: 'text' }); return r.data as string
 }
 export async function putFile(path: string, body: string, contentType='text/plain; charset=utf-8', lockToken?: string) {
