@@ -86,8 +86,7 @@ export default function TreeSidebar({
 
   // ---- Helpers to (re)load children of a specific path (for instant UI) ----
   async function fetchChildren(path: string): Promise<Node[]> {
-    const r = await fetch(`/api/files/tree?path=${encodeURIComponent(path)}`)
-    let items: TreeItem[] = await r.json()
+    let items = await getTree(path)
     items = items.filter(d => d.path !== path)
     return items.map(d => {
       const relative = d.path.startsWith(path + "/") ? d.path.slice(path.length + 1) : d.path

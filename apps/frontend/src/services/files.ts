@@ -7,13 +7,14 @@ export type TreeItem = { name: string; path: string; isDir: boolean }
 
 export async function getTree(path = '') {
   const { data } = await http.get('/files/tree', { params: { path } })
-  return data
+  return data as TreeItem[]
 }
 
 export function useTree(path: string) {
   return useQuery({ queryKey: ['tree', path],
     queryFn: async () => (await http.get<TreeItem[]>('/files/tree', { params: { path } })).data })
 }
+
 export async function getFile(path: string) {
   const r = await http.get('/files/content', { params: { path }, responseType: 'text' }); return r.data as string
 }
