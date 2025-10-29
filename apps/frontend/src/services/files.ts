@@ -5,11 +5,16 @@ export const http = axios.create({ baseURL: API_BASE });
 
 export type TreeItem = { name: string; path: string; isDir: boolean }
 
+export async function getTree(path = '') {
+  const { data } = await http.get('/files/tree', { params: { path } })
+  return data
+}
+
 export function useTree(path: string) {
   return useQuery({ queryKey: ['tree', path],
     queryFn: async () => (await http.get<TreeItem[]>('/files/tree', { params: { path } })).data })
 }
-export async function getTree(path: string) {
+export async function getFile(path: string) {
   const r = await http.get('/files/content', { params: { path }, responseType: 'text' }); return r.data as string
 }
 export async function putFile(path: string, body: string, contentType='text/plain; charset=utf-8', lockToken?: string) {
