@@ -22,3 +22,8 @@ app.include_router(files.router,  prefix="/api")
 
 @app.get("/healthz")
 def healthz(): return {"ok": True}
+
+# also expose under /api for frontend testers
+@app.get("/api/healthz")
+def healthz_api():
+    return {"ok": True}
