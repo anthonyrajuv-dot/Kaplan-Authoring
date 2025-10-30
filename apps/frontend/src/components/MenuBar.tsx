@@ -10,7 +10,13 @@ type Item = {
 }
 type Menu = { title: string; items: Item[] }
 
-export default function MenuBar({ menus }: { menus: Menu[] }) {
+export default function MenuBar({
+  menus,
+  rightSlot,                               // ← NEW
+}: {
+  menus: Menu[]
+  rightSlot?: React.ReactNode              // ← NEW
+}) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const barRef = useRef<HTMLDivElement>(null)
 
@@ -35,101 +41,110 @@ export default function MenuBar({ menus }: { menus: Menu[] }) {
       ref={barRef}
       style={{
         display: 'flex',
-        gap: 12,
+        justifyContent: 'space-between',      // ← split left / right
+        alignItems: 'center',
         padding: '4px 8px',
-        borderBottom: '1px solid #ddd',
         userSelect: 'none',
-        background: '#fafafa',
         position: 'relative',
         zIndex: 10,
+        background: 'rgba(11, 18, 35, 0.9)',  // ← your palette
+        borderBottom: '1px solid #263043',
       }}
     >
-      {menus.map((m, i) => (
-        <div
-          key={m.title}
-          style={{ position: 'relative' }}
-          onMouseEnter={() => (openIndex !== null ? setOpenIndex(i) : undefined)}
-        >
-          <button
-            onClick={() => setOpenIndex(openIndex === i ? null : i)}
-            style={{
-              background: openIndex === i ? '#e9e9e9' : 'transparent',
-              border: 'none',
-              padding: '4px 6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
+      {/* LEFT: menus */}
+      <div style={{ display: 'flex', gap: 12 }}>
+        {menus.map((m, i) => (
+          <div
+            key={m.title}
+            style={{ position: 'relative' }}
+            onMouseEnter={() => (openIndex !== null ? setOpenIndex(i) : undefined)}
           >
-            {m.title}
-          </button>
-
-          {/* Dropdown */}
-          {openIndex === i && (
-            <div
+            <button
+              onClick={() => setOpenIndex(openIndex === i ? null : i)}
               style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                minWidth: 240,
-                background: '#fff',
-                border: '1px solid #ddd',
-                boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
-                borderRadius: 4,
-                padding: 6,
+                background: openIndex === i ? 'rgba(255,255,255,0.06)' : 'transparent',
+                color: '#e2e8f0',
+                border: 'none',
+                padding: '4px 6px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                borderRadius: 6,
               }}
-              onMouseLeave={() => setOpenIndex(null)}
             >
-              {m.items.map((it, idx) => (
-                <div key={idx}>
-                  {it.dividerAbove && (
-                    <div style={{ height: 1, background: '#eee', margin: '6px 4px' }} />
-                  )}
-                  <button
-                    disabled={!!it.disabled}
-                    onClick={() => {
-                      if (it.disabled) return
-                      setOpenIndex(null)
-                      it.onClick?.()
-                    }}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between', // <-- shortcut right aligned
-                      gap: 12,
-                      padding: '6px 8px',
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: it.disabled ? 'default' : 'pointer',
-                      color: it.disabled ? '#aaa' : '#222',
-                      borderRadius: 4,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!it.disabled) (e.currentTarget.style.backgroundColor = '#f4f4f4')
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                  >
-                    <span style={{ pointerEvents: 'none' }}>{it.label}</span>
-                    {it.shortcut && (
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: '#888', // muted shortcut
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        {it.shortcut}
-                      </span>
+              {m.title}
+            </button>
+
+            {/* Dropdown */}
+            {openIndex === i && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  minWidth: 240,
+                  background: 'rgba(11,18,35,0.98)',
+                  border: '1px solid #263043',
+                  boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
+                  borderRadius: 8,
+                  padding: 6,
+                }}
+                onMouseLeave={() => setOpenIndex(null)}
+              >
+                {m.items.map((it, idx) => (
+                  <div key={idx}>
+                    {it.dividerAbove && (
+                      <div style={{ height: 1, background: '#263043', margin: '6px 4px' }} />
                     )}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+                    <button
+                      disabled={!!it.disabled}
+                      onClick={() => {
+                        if (it.disabled) return
+                        setOpenIndex(null)
+                        it.onClick?.()
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between', // shortcut right aligned
+                        gap: 12,
+                        padding: '6px 8px',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: it.disabled ? 'default' : 'pointer',
+                        color: it.disabled ? '#64748b' : '#e2e8f0',
+                        borderRadius: 6,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!it.disabled) (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)')
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <span style={{ pointerEvents: 'none' }}>{it.label}</span>
+                      {it.shortcut && (
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: '#94a3b8', // muted shortcut
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          {it.shortcut}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* RIGHT: environment switcher (or any extra) */}
+      <div style={{ marginLeft: 12 }}>{rightSlot}</div>
     </div>
   )
 }

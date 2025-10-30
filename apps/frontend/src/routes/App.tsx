@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import MenuBar from '../components/MenuBar'
+import EnvSwitch from '../components/EnvSwitch'
 import TreeSidebar from '../components/TreeSidebar'
 import CodeEditor from '../components/CodeEditor'
 import TabBar, { type Tab } from '../components/TabBar'
@@ -429,7 +430,7 @@ const [lockDlg, setLockDlg] = useState<LockDialog>({ open:false, path:'', owner:
             borderBottom: '1px solid #263043',
           }}
         >
-          <MenuBar menus={menus} />
+          <MenuBar menus={menus} rightSlot={<EnvSwitch />} />
         </div>
 
         {/* === Sidebar + Main Editor === */}
