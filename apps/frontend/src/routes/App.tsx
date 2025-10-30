@@ -89,6 +89,9 @@ export default function App(){
   useEffect(()=>{ getBase().then(setBaseUrl) }, [])
   const [activePath, setActivePath] = useState<string | undefined>(undefined)
   const active = docs.find(d => d.path === activePath) ?? docs[0]
+  const [toast, setToast] = useState<string|null>(null)
+
+  function showToast(msg: string){ setToast(msg); setTimeout(()=>setToast(null), 1400) }
 
   // Listen for file-saved messages:
   useEffect(() => {
@@ -329,9 +332,12 @@ const [lockDlg, setLockDlg] = useState<LockDialog>({ open:false, path:'', owner:
   }
 
 
-  function copyAbs(path: string){
-    const url = `${baseUrl}/${path}`.replace(/([^:])\/+/g,'$1/')
-    navigator.clipboard?.writeText(url)
+  async function copyAbs(path: string){
+    // Build absolute URL from /api/files/base
+    const base = await getBase() // e.g., https://kaplan.componize.com/.../documentLibrary
+    const url = `${base.replace(/\/+$/,'')}/${path.replace(/^\/+/, '')}`
+    await navigator.clipboard.writeText(url)
+    showToast('Location Copied!')
   }
 
   function setDocText(path: string, text: string) {
@@ -564,6 +570,12 @@ const [lockDlg, setLockDlg] = useState<LockDialog>({ open:false, path:'', owner:
             </div>
           </div>
         </Modal>
+        {toast && (
+          <div style={{
+            position:'absolute', right:16, bottom:16, padding:'8px 12px',
+            background:'rgba(0,0,0,0.65)', color:'#fff', borderRadius:8
+          }}>{toast}</div>
+          )}
       </div>
     </div>
   )

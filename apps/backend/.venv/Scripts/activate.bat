@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=D:\Full\Work\2025\Authoring_Tool\06\kaplan-lms-builder-complete\apps\backend\.venv
+set VIRTUAL_ENV=D:\github\Kaplan-Authoring\apps\backend\.venv
 
 if not defined PROMPT set PROMPT=$P$G
 
