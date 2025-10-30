@@ -5,14 +5,17 @@ from .routers import health, files
 
 app = FastAPI(title="Kaplan LMS Builder API")
 
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",                                  # local Vite dev
+    "https://anthonyrajuv-dot.github.io",                     # GitHub Pages domain
+    "https://anthonyrajuv-dot.github.io/Kaplan-Authoring"     # (often not needed, but fine)
+]
+
 origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://anthonyrajuv-dot.github.io",
-        "https://anthonyrajuv-dot.github.io/Kaplan-Authoring",
-    ],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,          # set False if you never use cookies/auth
     allow_methods=["*"],
     allow_headers=["*"],
 )
