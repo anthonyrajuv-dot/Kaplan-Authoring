@@ -1,83 +1,71 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+// apps/frontend/src/components/ContextMenu.tsx
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 export type CtxItem = {
-  label?: string
-  shortcut?: string
+  label: string
+  onClick?: () => void
   disabled?: boolean
   dividerAbove?: boolean
-  onClick?: () => void
 }
 
 export default function ContextMenu({
   x, y, items, onClose
-}: { x: number; y: number; items: CtxItem[]; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement|null>(null)
-  const [pos, setPos] = useState({ x, y })
+}: {
+  x: number; y: number; items: CtxItem[]; onClose: () => void
+}) {
+  const boxRef = useRef<HTMLDivElement | null>(null)
 
-  // Defer installing global listeners so the opening event doesn't instantly close it
   useEffect(() => {
-    const close = () => onClose()
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    const t = setTimeout(() => {
-      document.addEventListener('pointerdown', close, { capture: true })
-      document.addEventListener('contextmenu', close, { capture: true })
-      document.addEventListener('keydown', key)
-    }, 0)
+    const onDocMouseDown = (e: MouseEvent) => {
+      // only close if the click is outside the menu
+      if (boxRef.current && boxRef.current.contains(e.target as Node)) return
+      onClose()
+    }
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+
+    document.addEventListener('mousedown', onDocMouseDown)
+    document.addEventListener('keydown', onEsc)
     return () => {
-      clearTimeout(t)
-      document.removeEventListener('pointerdown', close, { capture: true } as any)
-      document.removeEventListener('contextmenu', close, { capture: true } as any)
-      document.removeEventListener('keydown', key)
+      document.removeEventListener('mousedown', onDocMouseDown)
+      document.removeEventListener('keydown', onEsc)
     }
   }, [onClose])
 
-  // Clamp to viewport
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const vw = window.innerWidth, vh = window.innerHeight
-    setPos({
-      x: Math.min(x, Math.max(8, vw - rect.width - 8)),
-      y: Math.min(y, Math.max(8, vh - rect.height - 8)),
-    })
-  }, [x, y])
-
   const menu = (
     <div
-      ref={ref}
+      ref={boxRef}
       style={{
-        position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999,
-        minWidth: 220, padding: 6,
-        background: 'rgba(11,18,35,0.95)',
-        color: '#e2e8f0',
-        backdropFilter: 'blur(10px)',
+        position: 'fixed', left: x, top: y, zIndex: 9999,
+        background: 'rgba(11,18,35,0.98)',
         border: '1px solid #263043',
-        borderRadius: 8,
-        boxShadow: '0 10px 30px rgba(0,0,0,.35)',
+        boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
+        borderRadius: 8, padding: 6, minWidth: 220
       }}
-      onClick={e => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.stopPropagation()}  // prevent bubbling to document
     >
       {items.map((it, i) => (
         <div key={i}>
-          {it.dividerAbove && <div style={{borderTop:'1px solid #263043', margin:'6px 8px'}} />}
+          {it.dividerAbove && <div style={{ height:1, background:'#263043', margin:'6px 4px' }}/>}
           <button
-            disabled={it.disabled}
-            onClick={()=>{ it.onClick?.(); onClose() }}
+            disabled={!!it.disabled}
+            onClick={() => { if (!it.disabled) it.onClick?.(); onClose() }}
             style={{
-              width:'100%', textAlign:'left',
-              background:'transparent', border:'none', color: it.disabled ? '#64748b' : '#e2e8f0',
-              padding:'8px 10px', borderRadius:6, cursor: it.disabled ? 'default':'pointer',
-              display:'flex', justifyContent:'space-between', alignItems:'center'
+              width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center',
+              gap: 8, padding: '6px 8px', border:'none', background:'transparent',
+              color: it.disabled ? '#64748b' : '#e2e8f0', cursor: it.disabled ? 'default' : 'pointer',
+              borderRadius: 6
             }}
+            onMouseEnter={(e)=>{ if (!it.disabled) (e.currentTarget.style.backgroundColor='rgba(255,255,255,0.06)') }}
+            onMouseLeave={(e)=>{ (e.currentTarget.style.backgroundColor='transparent') }}
           >
             <span>{it.label}</span>
-            {it.shortcut && <span style={{ color:'#94a3b8', fontSize:12 }}>{it.shortcut}</span>}
           </button>
         </div>
       ))}
     </div>
   )
+
   return createPortal(menu, document.body)
 }

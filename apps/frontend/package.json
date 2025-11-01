@@ -10,10 +10,14 @@
     "postbuild": "cp dist/index.html dist/404.html"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.19.1",
+    "@codemirror/commands": "^6.10.0",
+    "@codemirror/highlight": "^0.19.8",
     "@codemirror/lang-html": "^6.4.11",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-xml": "^6.1.0",
     "@codemirror/language": "^6.11.3",
+    "@codemirror/search": "^6.5.11",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.6",
     "@tanstack/react-query": "^5.56.2",

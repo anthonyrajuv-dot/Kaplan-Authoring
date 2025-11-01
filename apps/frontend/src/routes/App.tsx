@@ -31,18 +31,10 @@ type OpenDoc = {
   stale?: boolean
 }
 
-function readSavedToken(path: string): string | null {
-  return localStorage.getItem(`lock:${path}`)
-}
-function writeSavedToken(path: string, token: string) {
-  localStorage.setItem(`lock:${path}`, token)
-}
-function clearSavedToken(path: string) {
-  localStorage.removeItem(`lock:${path}`)
-}
-function normalizeToken(t?: string | null) {
-  return t ? t.replace(/[<>]/g, '').trim() : null
-}
+function readSavedToken(path: string): string | null { return localStorage.getItem(`lock:${path}`) }
+function writeSavedToken(path: string, token: string) { localStorage.setItem(`lock:${path}`, token) }
+function clearSavedToken(path: string) { localStorage.removeItem(`lock:${path}`) }
+function normalizeToken(t?: string | null) { return t ? t.replace(/[<>]/g, '').trim() : null }
 function beaconUnlock(path: string, token: string) {
   try {
     const body = new Blob([`token=${token}`], { type: 'text/plain' })
@@ -54,22 +46,16 @@ const BC_NAME = 'kaplan-editor'
 type BCMessage = { type: 'file-saved'; path: string; by: string; time: number }
 function makeBroadcaster() {
   let bc: BroadcastChannel | null = null
-  try {
-    bc = new BroadcastChannel(BC_NAME)
-  } catch {}
+  try { bc = new BroadcastChannel(BC_NAME) } catch {}
   function send(msg: BCMessage) {
     if (bc) bc.postMessage(msg)
-    try {
-      localStorage.setItem(`bc:${BC_NAME}`, JSON.stringify({ msg, nonce: Math.random(), t: Date.now() }))
-    } catch {}
+    try { localStorage.setItem(`bc:${BC_NAME}`, JSON.stringify({ msg, nonce: Math.random(), t: Date.now() })) } catch {}
   }
   function listen(onMsg: (msg: BCMessage) => void) {
     const handler = (ev: MessageEvent) => onMsg(ev.data as BCMessage)
     const lsHandler = (ev: StorageEvent) => {
       if (ev.key === `bc:${BC_NAME}` && ev.newValue) {
-        try {
-          onMsg(JSON.parse(ev.newValue).msg)
-        } catch {}
+        try { onMsg(JSON.parse(ev.newValue).msg) } catch {}
       }
     }
     if (bc) bc.addEventListener('message', handler)
@@ -90,56 +76,53 @@ export default function App() {
   const [activePath, setActivePath] = useState<string | undefined>(undefined)
   const [toast, setToast] = useState<string | null>(null)
   const [lockDlg, setLockDlg] = useState<LockDialog>({ open: false, path: '', owner: null })
+  const [canPaste, setCanPaste] = useState(false)
+  const reloadTreeNodeRef = useRef<(p:string)=>Promise<void>>()
 
-  useEffect(() => {
-    getBase().then(setBaseUrl)
-  }, [])
-
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 1400)
+  function registerReload(fn: (p:string)=>Promise<void>) {
+    reloadTreeNodeRef.current = fn
   }
+
+  async function onTreeAction(a: { type:string; path:string; isDir:boolean }) {
+    // Example: show a small toast for visibility
+    // setToast(`${a.type} → ${a.path}`)
+    // If you return without doing anything, TreeSidebar performs its built-in default action.
+  }
+
+
+  useEffect(() => { getBase().then(setBaseUrl) }, [])
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 1400) }
 
   const active = docs.find((d) => d.path === activePath) ?? docs[0]
 
-  // Broadcast: when any tab saves, mark others as stale / reload if clean
   useEffect(() => {
     return bus.listen((msg) => {
       if (msg.type !== 'file-saved') return
       let needsReload = false
       const targetPath = msg.path
-      setDocs((prev) => {
-        const next = prev.map((d) => {
-          if (d.path !== targetPath) return d
-          if (d.dirty) return { ...d, stale: true } // show banner
-          needsReload = true // clean or readOnly: will reload
-          return d
-        })
-        return next
-      })
+      setDocs((prev) => prev.map((d) => {
+        if (d.path !== targetPath) return d
+        if (d.dirty) return { ...d, stale: true }
+        needsReload = true
+        return d
+      }))
       if (needsReload) {
-        ;(async () => {
+        (async () => {
           try {
             const fresh = await getFile(targetPath)
-            setDocs((cur) =>
-              cur.map((d) =>
-                d.path === targetPath && (!d.dirty || d.readOnly) ? { ...d, text: fresh, stale: false, dirty: false } : d,
-              ),
-            )
+            setDocs((cur) => cur.map((d) =>
+              d.path === targetPath && (!d.dirty || d.readOnly) ? { ...d, text: fresh, stale: false, dirty: false } : d
+            ))
           } catch {}
         })()
       }
     })
   }, [bus])
 
-  // Refresh on focus for any clean+stale docs
   useEffect(() => {
     async function refreshCleanStale() {
       let targets: string[] = []
-      setDocs((prev) => {
-        targets = prev.filter((d) => d.stale && !d.dirty).map((d) => d.path)
-        return prev
-      })
+      setDocs((prev) => { targets = prev.filter((d) => d.stale && !d.dirty).map((d) => d.path); return prev })
       for (const p of targets) {
         try {
           const fresh = await getFile(p)
@@ -147,36 +130,24 @@ export default function App() {
         } catch {}
       }
     }
-    function onFocus() {
-      refreshCleanStale()
-    }
-    function onVis() {
-      if (!document.hidden) refreshCleanStale()
-    }
+    function onFocus() { refreshCleanStale() }
+    function onVis() { if (!document.hidden) refreshCleanStale() }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVis)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVis)
-    }
+    return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onVis) }
   }, [])
 
-  // Warn & unlock on close
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (docs.some((d) => d.dirty)) {
-        e.preventDefault()
-        e.returnValue = ''
-      }
+      if (docs.some((d) => d.dirty)) { e.preventDefault(); e.returnValue = '' }
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [docs])
+
   useEffect(() => {
     function onPageHideOrUnload() {
-      docs.forEach((d) => {
-        if (d.lockToken && !d.readOnly) beaconUnlock(d.path, d.lockToken)
-      })
+      docs.forEach((d) => { if (d.lockToken && !d.readOnly) beaconUnlock(d.path, d.lockToken) })
     }
     window.addEventListener('pagehide', onPageHideOrUnload)
     window.addEventListener('beforeunload', onPageHideOrUnload)
@@ -193,14 +164,14 @@ export default function App() {
       if (info.owner && info.owner.trim().toLowerCase() === CURRENT_USER_ID.toLowerCase()) {
         setLockDlg({ open: true, path, owner: `You (${info.owner}) in another tab/window` })
         const content = await getFile(path)
-        openInTab(path, content, undefined, true) // read-only
+        openInTab(path, content, undefined, true)
         setActivePath(path)
         clearSavedToken(path)
         return
       }
       setLockDlg({ open: true, path, owner: info.owner || 'Another user' })
       const content = await getFile(path)
-      openInTab(path, content, undefined, true) // read-only
+      openInTab(path, content, undefined, true)
       setActivePath(path)
       clearSavedToken(path)
       return
@@ -214,12 +185,8 @@ export default function App() {
   }
 
   async function refreshTab(path: string) {
-    const doc = docs.find((d) => d.path === path)
-    if (!doc) return
-    if (doc.dirty) {
-      const cont = confirm(`Discard unsaved changes and reload ${doc.name}?`)
-      if (!cont) return
-    }
+    const doc = docs.find((d) => d.path === path); if (!doc) return
+    if (doc.dirty) { const cont = confirm(`Discard unsaved changes and reload ${doc.name}?`); if (!cont) return }
     const fresh = await getFile(path)
     setDocs((cur) => cur.map((d) => (d.path === path ? { ...d, text: fresh, stale: false, dirty: false } : d)))
   }
@@ -251,35 +218,22 @@ export default function App() {
     setDocs((ds) => ds.map((d) => (d.path === path ? { ...d, text, dirty: true } : d)))
   }
 
-  function activate(path: string) {
-    setActivePath(path)
-  }
+  function activate(path: string) { setActivePath(path) }
 
   async function close(path: string) {
-    const doc = docs.find((d) => d.path === path)
-    if (!doc) return
+    const doc = docs.find((d) => d.path === path); if (!doc) return
     if (doc.dirty && !doc.readOnly) {
       const saveIt = confirm(`Save changes to ${doc.name}?`)
-      if (saveIt) {
-        try {
-          await putFile(doc.path, doc.text, 'text/plain; charset=utf-8', doc.lockToken)
-        } catch {}
-      }
+      if (saveIt) { try { await putFile(doc.path, doc.text, 'text/plain; charset=utf-8', doc.lockToken) } catch {} }
     }
     if (doc.lockToken && !doc.readOnly) {
-      try {
-        await unlockPath(doc.path, doc.lockToken)
-      } catch {
-        beaconUnlock(doc.path, doc.lockToken)
-      } finally {
-        clearSavedToken(doc.path)
-      }
+      try { await unlockPath(doc.path, doc.lockToken) }
+      catch { beaconUnlock(doc.path, doc.lockToken) }
+      finally { clearSavedToken(doc.path) }
     }
     setDocs((prev) => {
       const next = prev.filter((d) => d.path !== path)
-      if (path === activePath) {
-        setActivePath(next[0]?.path)
-      }
+      if (path === activePath) setActivePath(next[0]?.path)
       return next
     })
   }
@@ -287,8 +241,13 @@ export default function App() {
   async function copyAbs(path: string) {
     const base = await getBase()
     const url = `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
-    await navigator.clipboard.writeText(url)
-    showToast('Location Copied!')
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast('Location Copied!')
+    } catch {
+      // Fallback prompt (works everywhere)
+      window.prompt('Copy URL:', url)
+    }
   }
 
   async function formatActive() {
@@ -310,13 +269,10 @@ export default function App() {
   }
 
   const menus = [
-    {
-      title: 'File',
-      items: [
-        { label: 'Save', shortcut: 'Ctrl+S', onClick: saveActive, disabled: !active || active.readOnly },
-        { label: 'Close Tab', shortcut: 'Ctrl+Q', onClick: () => active && close(active.path), disabled: !active },
-      ],
-    },
+    { title: 'File', items: [
+      { label: 'Save', shortcut: 'Ctrl+S', onClick: saveActive, disabled: !active || active.readOnly },
+      { label: 'Close Tab', shortcut: 'Ctrl+Q', onClick: () => active && close(active.path), disabled: !active },
+    ]},
     { title: 'Edit', items: [{ label: 'Format & Indent', shortcut: 'Ctrl+I', onClick: formatActive, disabled: !active }] },
     { title: 'Find', items: [{ label: 'Find…', shortcut: 'Ctrl+F', onClick: () => {} }] },
     { title: 'Project', items: [{ label: 'Settings (stub)' }] },
@@ -328,95 +284,59 @@ export default function App() {
     { title: 'Help', items: [{ label: 'About', onClick: () => alert('Kaplan LMS Builder (prototype)') }] },
   ]
 
-  // hotkeys
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
-        e.preventDefault()
-        formatActive()
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault()
-        saveActive()
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'q' && active) {
-        e.preventDefault()
-        close(active.path)
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') { e.preventDefault(); formatActive() }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveActive() }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'q' && active) { e.preventDefault(); close(active.path) }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [active])
 
   return (
-    <div
-      style={{
-        background: '#0f172a',
-        minHeight: '100vh',
-        padding: '24px',
-        boxSizing: 'border-box',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-    >
-      <div
-        style={{
-          background: 'rgba(11, 18, 35, 1)',
-          borderRadius: '10px',
-          boxShadow: '0 6px 24px rgba(0, 0, 0, 0.6)',
-          display: 'flex',
-          flexDirection: 'column',
-          width: '100%',
-          maxWidth: '1800px',
-          height: 'calc(100vh - 48px)',
-          overflow: 'hidden',
-          color: '#e2e8f0',
-        }}
-      >
+    <div style={{
+      background:'#0f172a', minHeight:'100vh', padding:'24px', boxSizing:'border-box',
+      display:'flex', justifyContent:'center', alignItems:'center'
+    }}>
+      <div style={{
+        background:'rgba(11, 18, 35, 1)', borderRadius:'10px', boxShadow:'0 6px 24px rgba(0,0,0,0.6)',
+        display:'flex', flexDirection:'column', width:'100%', maxWidth:'1800px',
+        height:'calc(100vh - 48px)', overflow:'hidden', color:'#e2e8f0'
+      }}>
         {/* Menubar */}
-        <div
-          style={{
-            flex: '0 0 auto',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
-            backdropFilter: 'blur(10px)',
-            background: 'rgba(11, 18, 35, 0.9)',
-            borderBottom: '1px solid #263043',
-          }}
-        >
+        <div style={{
+          flex:'0 0 auto', position:'sticky', top:0, zIndex:10,
+          backdropFilter:'blur(10px)', background:'rgba(11, 18, 35, 0.9)', borderBottom:'1px solid #263043'
+        }}>
           <MenuBar menus={menus} rightSlot={<EnvSwitch />} />
         </div>
 
-        {/* Body: Sidebar + Editor */}
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '280px 1fr', overflow: 'hidden' }}>
-          {/* Sidebar area (container styles live here; panel styles inside TreeSidebar) */}
-          <div
-            style={{
-              backdropFilter: 'blur(10px)',
-              background: 'rgba(11, 18, 35, 0.92)',
-              borderRight: '1px solid #263043',
-              overflow: 'hidden',
-              color: '#cbd5e1',
-            }}
-          >
-            <TreeSidebar onOpen={(it) => openFilePath(it.path)} />
+        {/* Body: Sidebar + Editor (FLEX so sidebar resizer works) */}
+        <div style={{ flex:1, display:'flex', minHeight:0 }}>
+          {/* Sidebar container (TreeSidebar renders its own panel + handle) */}
+          <div style={{
+            backdropFilter:'blur(10px)', background:'rgba(11, 18, 35, 0.92)',
+            borderRight:'1px solid #263043', overflow:'hidden', color:'#cbd5e1'
+          }}>
+            <TreeSidebar
+            onOpen={(it) => openFilePath(it.path)} 
+            onAction={onTreeAction}         // optional (can remove)
+            canPaste={canPaste}             // optional hint (TreeSidebar also tracks its own)
+            registerReload={registerReload}
+            />
           </div>
 
           {/* Right side */}
-          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
             {/* Tabs */}
-            <div
-              style={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 9,
-                backdropFilter: 'blur(10px)',
-                background: 'rgba(11, 18, 35, 0.9)',
-                borderBottom: '1px solid #263043',
-              }}
-            >
+            <div style={{
+              position:'sticky', top:0, zIndex:9,
+              backdropFilter:'blur(10px)', 
+              background:'rgba(11, 18, 35, 0.9)', 
+              borderBottom:'1px solid #263043',
+              fontSize: 16,
+            }}>
               <TabBar
                 tabs={docs.map((d) => ({ path: d.path, name: d.name + (d.dirty ? '*' : ''), url: d.url }))}
                 active={activePath}
@@ -428,35 +348,16 @@ export default function App() {
             </div>
 
             {/* Path + Save */}
-            <div
-              style={{
-                flex: '0 0 auto',
-                padding: '4px 10px',
-                borderBottom: '1px solid #eee',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <div style={{ fontSize: 12, color: '#666', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {active ? shortenHead(active.url, 100) : '—'}
-                {active?.readOnly ? ' (read-only)' : ''}
+            <div style={{ flex:'0 0 auto', padding:'0px 10px', borderBottom:'1px solid #eee',
+                          display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ fontSize:12, color:'#666', flex:1, overflow:'hidden', textOverflow:'ellipsis' }}>
+                {active ? shortenHead(active.url, 100) : '—'}{active?.readOnly ? ' (read-only)' : ''}
               </div>
-              <button onClick={saveActive} disabled={!active || active.readOnly}>
-                Save (Ctrl+S)
-              </button>
+              <button onClick={saveActive} disabled={!active || active.readOnly}>Save (Ctrl+S)</button>
             </div>
 
             {/* Editor */}
-            <div
-              style={{
-                flex: 1,
-                overflow: 'auto',
-                backdropFilter: 'blur(16px)',
-                background: 'rgba(11, 18, 35, 1)',
-                color: '#e2e8f0',
-              }}
-            >
+            <div style={{ flex:1, overflow:'auto', backdropFilter:'blur(16px)', background:'rgba(11, 18, 35, 1)' }}>
               {active ? (
                 <CodeEditor
                   key={active.path}
@@ -464,9 +365,11 @@ export default function App() {
                   language={active.lang}
                   onSave={saveActive}
                   onChange={(next) => setDocText(active.path, next)}
+                  onOpenFile={(rel) => openFilePath(rel)}
+                  activePath={active.path}
                 />
               ) : (
-                <div style={{ padding: 16, color: '#94a3b8' }}>Open a file from the left tree…</div>
+                <div style={{ padding:16, color:'#94a3b8' }}>Open a file from the left tree…</div>
               )}
             </div>
           </div>
@@ -479,12 +382,8 @@ export default function App() {
           onClose={() => setLockDlg({ open: false, path: '', owner: null })}
         >
           <div style={{ lineHeight: 1.5 }}>
-            <div>
-              <strong>Path:</strong> {lockDlg.path}
-            </div>
-            <div>
-              <strong>Locked by:</strong> {lockDlg.owner || 'Unknown'}
-            </div>
+            <div><strong>Path:</strong> {lockDlg.path}</div>
+            <div><strong>Locked by:</strong> {lockDlg.owner || 'Unknown'}</div>
             <div style={{ marginTop: 8, color: '#666' }}>
               The file is opened read-only. Close the other editor to release the lock, then refresh and try again.
             </div>
@@ -493,19 +392,10 @@ export default function App() {
 
         {/* Toast */}
         {toast && (
-          <div
-            style={{
-              position: 'absolute',
-              right: 16,
-              bottom: 16,
-              padding: '8px 12px',
-              background: 'rgba(0,0,0,0.65)',
-              color: '#fff',
-              borderRadius: 8,
-            }}
-          >
-            {toast}
-          </div>
+          <div style={{
+            position:'absolute', right:16, bottom:16, padding:'8px 12px',
+            background:'rgba(0,0,0,0.65)', color:'#fff', borderRadius:8
+          }}>{toast}</div>
         )}
       </div>
     </div>
